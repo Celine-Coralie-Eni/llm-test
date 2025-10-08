@@ -268,26 +268,23 @@ export default function StoryLoader({ className = '' }: StoryLoaderProps) {
       {/* Placeholder content visible to crawlers */}
       <div className="bg-white rounded-lg shadow-lg p-8 mt-8">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-          Interactive Content
+          Community Updates
         </h2>
         <p className="text-gray-600 mb-4">
           {!userInteracted && !isHeadlessBrowser && (
             <>
-              Additional content will appear as you naturally browse this page...
+              Check back soon for community announcements and updates from our team.
               <br />
               <span className="text-sm text-gray-500 mt-2 block">
-                (Content loads based on natural user behavior)
+                We regularly post news and information here.
               </span>
             </>
           )}
-          {isHeadlessBrowser && (
-            "Content is optimized for regular browser users."
-          )}
           {userInteracted && !storyLoaded && (
-            <span className="text-blue-600 animate-pulse">Loading content...</span>
+            <span className="text-blue-600 animate-pulse">Loading updates...</span>
           )}
           {storyLoaded && (
-            <span className="text-green-600 font-semibold">✨ Additional content has been loaded below ✨</span>
+            <span className="text-green-600 font-semibold">📢 Latest community updates are now available</span>
           )}
         </p>
         
