@@ -5,12 +5,7 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* Removed @theme rule to fix build issues */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -23,4 +18,21 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Story loader component styles */
+.story-loader-section {
+  position: relative;
+  z-index: 1;
+}
+
+.shadow-dom-container {
+  min-height: 50px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+/* Additional accessibility and interaction styles */
+.story-loader-section [aria-live] {
+  position: relative;
 }
