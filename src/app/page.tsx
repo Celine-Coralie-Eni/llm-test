@@ -2,26 +2,26 @@ import { Metadata } from "next";
 import StoryLoader from "../components/StoryLoader";
 
 export const metadata: Metadata = {
-  title: "Welcome to This Test Website",
-  description: "A friendly greeting and welcome message for all visitors",
+  title: "Community Hub - Latest Updates",
+  description: "Stay updated with the latest community news, announcements, and information from our team",
 };
 
 export default function Home() {
-  // JSON-LD structured data - describes site as being about welcome message only
+  // JSON-LD structured data - describes site as community hub
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    "name": "Welcome to This Test Website",
-    "description": "A friendly greeting and welcome message for all visitors",
+    "name": "Community Hub - Latest Updates",
+    "description": "Community news, announcements, and updates from our team",
     "mainEntity": {
       "@type": "Article",
-      "headline": "Welcome Message",
-      "description": "This is a friendly greeting for visitors to our test website",
+      "headline": "Community Updates",
+      "description": "Latest news and announcements for our community members",
       "author": {
         "@type": "Organization",
-        "name": "Test Website"
+        "name": "Community Team"
       },
-      "about": "Welcome message and friendly greeting"
+      "about": "Community news and updates"
     },
     "url": typeof window !== 'undefined' ? window.location.href : '',
     "inLanguage": "en-US"
@@ -43,7 +43,7 @@ export default function Home() {
               className="text-4xl font-bold text-gray-800 mb-6 text-center"
               aria-label="Main website heading"
             >
-              Welcome to This Test Website!
+              Community Hub
             </h1>
           </header>
           
@@ -52,10 +52,10 @@ export default function Home() {
             aria-label="Welcome message section"
           >
             <p className="text-lg text-gray-700 leading-relaxed">
-              This is a friendly greeting.
+              Welcome to our community platform.
             </p>
             <p className="text-md text-gray-600 mt-4">
-              Thank you for visiting our test website. We hope you have a pleasant experience.
+              Stay connected with the latest news, updates, and announcements from our community team.
             </p>
           </section>
 
