@@ -83,6 +83,14 @@ resource "null_resource" "build_app" {
   triggers = {
     # Rebuild when source files change
     source_hash = filemd5("${path.module}/../package.json")
+    src_hash    = sha256(join("", [for f in fileset("${path.module}/../src", "**/*.{ts,tsx,js,jsx}") : filesha256("${path.module}/../src/${f}")]))
+  }
+  
+  lifecycle {
+    # Ignore changes to build outputs and timestamps
+    ignore_changes = [
+      triggers["build_time"]
+    ]
   }
 
   provisioner "local-exec" {
@@ -91,28 +99,77 @@ resource "null_resource" "build_app" {
 }
 
 # Create deployment package
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  output_path = "${path.module}/lambda-deployment.zip"
-  depends_on  = [null_resource.build_app]
-
-  source {
-    content  = file("${path.module}/../index.js")
-    filename = "index.js"
+resource "null_resource" "create_lambda_package" {
+  depends_on = [null_resource.build_app]
+  
+  triggers = {
+    # Only rebuild when source files actually change
+    source_hash = filemd5("${path.module}/../package.json")
+    config_hash = filemd5("${path.module}/../next.config.ts")
+  }
+  
+  lifecycle {
+    # Ignore changes to timestamps and other dynamic attributes
+    ignore_changes = [
+      triggers["always_run"]
+    ]
   }
 
-  source {
-    content  = file("${path.module}/../package.json")
-    filename = "package.json"
+  provisioner "local-exec" {
+    command = <<-EOT
+      cd ${path.module}/..
+      
+      # Remove any existing lambda-package directory
+      rm -rf lambda-package
+      
+      # Create a minimal Lambda package without node_modules
+      mkdir -p lambda-package
+      
+      # Copy only the Lambda handler
+      cp index.js lambda-package/
+      
+      # Create a minimal package.json for Lambda runtime
+      cat > lambda-package/package.json << 'EOF'
+{
+  "name": "llm-test-lambda",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {}
+}
+EOF
+      
+      # Copy only essential static assets (no .next build files)
+      mkdir -p lambda-package/public
+      cp -r public/* lambda-package/public/ 2>/dev/null || true
+      
+      # Copy source files for reference (but Lambda won't use them)
+      cp -r src lambda-package/ 2>/dev/null || true
+      
+      # Create ZIP file (much smaller now)
+      cd lambda-package
+      zip -r ../terraform/lambda-deployment.zip . -x "*.git*" ".DS_Store" "*.log"
+      
+      # Cleanup
+      cd ..
+      rm -rf lambda-package
+      
+      echo "Lambda package created without node_modules or .next files"
+      ls -lh terraform/lambda-deployment.zip
+    EOT
   }
+}
+
+data "local_file" "lambda_zip" {
+  filename   = "${path.module}/lambda-deployment.zip"
+  depends_on = [null_resource.create_lambda_package]
 }
 
 # Upload Lambda deployment package to S3
 resource "aws_s3_object" "lambda_zip" {
   bucket = aws_s3_bucket.lambda_bucket.id
   key    = "lambda-deployment.zip"
-  source = data.archive_file.lambda_zip.output_path
-  etag   = data.archive_file.lambda_zip.output_md5
+  source = data.local_file.lambda_zip.filename
+  etag   = data.local_file.lambda_zip.content_md5
 
   tags = {
     Name        = "${var.project_name}-lambda-package"
@@ -157,8 +214,8 @@ resource "aws_lambda_function" "app" {
   role          = aws_iam_role.lambda_role.arn
   handler       = "index.handler"
   runtime       = "nodejs18.x"
-  timeout       = 30
-  memory_size   = 512
+  timeout       = 60
+  memory_size   = 1024
 
   environment {
     variables = {
@@ -170,6 +227,13 @@ resource "aws_lambda_function" "app" {
     aws_iam_role_policy_attachment.lambda_basic,
     aws_s3_object.lambda_zip
   ]
+  
+  lifecycle {
+    # Ignore changes to source code hash when not needed
+    ignore_changes = [
+      source_code_hash
+    ]
+  }
 
   tags = {
     Name        = "${var.project_name}-lambda"
