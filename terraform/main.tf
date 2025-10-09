@@ -78,103 +78,74 @@ resource "aws_s3_bucket_public_access_block" "lambda_bucket_pab" {
   restrict_public_buckets = true
 }
 
-# Build the Next.js app
-resource "null_resource" "build_app" {
-  triggers = {
-    # Rebuild when source files change
-    source_hash = filemd5("${path.module}/../package.json")
-    src_hash    = sha256(join("", [for f in fileset("${path.module}/../src", "**/*.{ts,tsx,js,jsx}") : filesha256("${path.module}/../src/${f}")]))
-  }
-  
-  lifecycle {
-    # Ignore changes to build outputs and timestamps
-    ignore_changes = [
-      triggers["build_time"]
-    ]
+# ECR Repository for Docker images
+resource "aws_ecr_repository" "app_repo" {
+  name                 = "${var.project_name}-app"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
   }
 
-  provisioner "local-exec" {
-    command = "cd ${path.module}/.. && npm run build"
+  tags = {
+    Name        = "${var.project_name}-ecr-repo"
+    Environment = var.environment
+    Project     = "llm-test"
   }
 }
 
-# Create deployment package
-resource "null_resource" "create_lambda_package" {
-  depends_on = [null_resource.build_app]
-  
-  triggers = {
-    # Only rebuild when source files actually change
-    source_hash = filemd5("${path.module}/../package.json")
-    config_hash = filemd5("${path.module}/../next.config.ts")
-  }
-  
-  lifecycle {
-    # Ignore changes to timestamps and other dynamic attributes
-    ignore_changes = [
-      triggers["always_run"]
+# ECR Repository Policy
+resource "aws_ecr_repository_policy" "app_repo_policy" {
+  repository = aws_ecr_repository.app_repo.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "LambdaECRImageRetrievalPolicy"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer"
+        ]
+      }
     ]
+  })
+}
+
+# Build and push Docker image
+resource "null_resource" "docker_build_push" {
+  triggers = {
+    # Rebuild when source files change
+    source_hash = filemd5("${path.module}/../package.json")
+    dockerfile_hash = filemd5("${path.module}/../Dockerfile")
+    src_hash = sha256(join("", [for f in fileset("${path.module}/../src", "**/*.{ts,tsx,js,jsx}") : filesha256("${path.module}/../src/${f}")]))
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       cd ${path.module}/..
       
-      # Remove any existing lambda-package directory
-      rm -rf lambda-package
+      # Get ECR login token
+      aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.app_repo.repository_url}
       
-      # Create a minimal Lambda package without node_modules
-      mkdir -p lambda-package
+      # Build Docker image
+      docker build -t llm-test .
       
-      # Copy only the Lambda handler
-      cp index.js lambda-package/
+      # Tag for ECR
+      docker tag llm-test:latest ${aws_ecr_repository.app_repo.repository_url}:latest
       
-      # Create a minimal package.json for Lambda runtime
-      cat > lambda-package/package.json << 'EOF'
-{
-  "name": "llm-test-lambda",
-  "version": "1.0.0",
-  "main": "index.js",
-  "dependencies": {}
-}
-EOF
+      # Push to ECR
+      docker push ${aws_ecr_repository.app_repo.repository_url}:latest
       
-      # Copy only essential static assets (no .next build files)
-      mkdir -p lambda-package/public
-      cp -r public/* lambda-package/public/ 2>/dev/null || true
-      
-      # Copy source files for reference (but Lambda won't use them)
-      cp -r src lambda-package/ 2>/dev/null || true
-      
-      # Create ZIP file (much smaller now)
-      cd lambda-package
-      zip -r ../terraform/lambda-deployment.zip . -x "*.git*" ".DS_Store" "*.log"
-      
-      # Cleanup
-      cd ..
-      rm -rf lambda-package
-      
-      echo "Lambda package created without node_modules or .next files"
-      ls -lh terraform/lambda-deployment.zip
+      echo "Docker image pushed to ECR: ${aws_ecr_repository.app_repo.repository_url}:latest"
     EOT
   }
-}
 
-data "local_file" "lambda_zip" {
-  filename   = "${path.module}/lambda-deployment.zip"
-  depends_on = [null_resource.create_lambda_package]
-}
-
-# Upload Lambda deployment package to S3
-resource "aws_s3_object" "lambda_zip" {
-  bucket = aws_s3_bucket.lambda_bucket.id
-  key    = "lambda-deployment.zip"
-  source = data.local_file.lambda_zip.filename
-  etag   = data.local_file.lambda_zip.content_md5
-
-  tags = {
-    Name        = "${var.project_name}-lambda-package"
-    Environment = var.environment
-  }
+  depends_on = [aws_ecr_repository.app_repo]
 }
 
 # IAM role for Lambda
@@ -206,14 +177,39 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda_role.name
 }
 
-# Lambda function
+# IAM policy for ECR access
+resource "aws_iam_policy" "lambda_ecr_policy" {
+  name        = "${var.project_name}-lambda-ecr-policy"
+  description = "IAM policy for Lambda to access ECR"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = aws_ecr_repository.app_repo.arn
+      }
+    ]
+  })
+}
+
+# Attach ECR policy to Lambda role
+resource "aws_iam_role_policy_attachment" "lambda_ecr" {
+  policy_arn = aws_iam_policy.lambda_ecr_policy.arn
+  role       = aws_iam_role.lambda_role.name
+}
+
+# Lambda function using container image
 resource "aws_lambda_function" "app" {
   function_name = "${var.project_name}-app"
-  s3_bucket     = aws_s3_bucket.lambda_bucket.id
-  s3_key        = aws_s3_object.lambda_zip.key
   role          = aws_iam_role.lambda_role.arn
-  handler       = "index.handler"
-  runtime       = "nodejs18.x"
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.app_repo.repository_url}:latest"
   timeout       = 60
   memory_size   = 1024
 
@@ -225,13 +221,13 @@ resource "aws_lambda_function" "app" {
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic,
-    aws_s3_object.lambda_zip
+    null_resource.docker_build_push
   ]
   
   lifecycle {
-    # Ignore changes to source code hash when not needed
+    # Ignore changes to image digest when not needed
     ignore_changes = [
-      source_code_hash
+      image_uri
     ]
   }
 
@@ -348,7 +344,12 @@ output "cloudfront_url" {
   value       = "https://${aws_cloudfront_distribution.app_distribution.domain_name}"
 }
 
+output "ecr_repository_url" {
+  description = "URL of the ECR repository"
+  value       = aws_ecr_repository.app_repo.repository_url
+}
+
 output "s3_bucket_name" {
-  description = "Name of the S3 bucket used for Lambda deployment"
+  description = "Name of the S3 bucket (kept for compatibility)"
   value       = aws_s3_bucket.lambda_bucket.id
 }

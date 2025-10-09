@@ -12,21 +12,34 @@ exports.handler = async (event, context) => {
     
     // Serve the main page for root requests
     if (requestPath === '/' || requestPath === '/index.html') {
-      // Read the pre-rendered HTML from Next.js build
-      const htmlPath = path.join(__dirname, '.next/server/app/page.html');
+      // Try to read the pre-rendered HTML from Next.js build
+      const possiblePaths = [
+        path.join(__dirname, '.next/server/app/index.html'),
+        path.join(__dirname, '.next/server/app/page.html'),
+        path.join(__dirname, '.next/server/pages/index.html')
+      ];
       
-      if (fs.existsSync(htmlPath)) {
-        const html = fs.readFileSync(htmlPath, 'utf8');
-        
-        return {
-          statusCode: 200,
-          headers: {
-            'Content-Type': 'text/html',
-            'Cache-Control': 'public, max-age=0, must-revalidate'
-          },
-          body: html
-        };
+      console.log('Looking for HTML files in:', possiblePaths);
+      
+      for (const htmlPath of possiblePaths) {
+        console.log('Checking path:', htmlPath, 'exists:', fs.existsSync(htmlPath));
+        if (fs.existsSync(htmlPath)) {
+          let html = fs.readFileSync(htmlPath, 'utf8');
+          console.log('Found HTML file, length:', html.length);
+          
+          // The CSS is already included in the Next.js build, no need to inject
+          return {
+            statusCode: 200,
+            headers: {
+              'Content-Type': 'text/html',
+              'Cache-Control': 'public, max-age=0, must-revalidate'
+            },
+            body: html
+          };
+        }
       }
+      
+      console.log('No HTML files found, using fallback');
     }
     
     // Handle static assets
@@ -71,9 +84,63 @@ exports.handler = async (event, context) => {
   }
   </script>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #000; color: #fff; }
-    .container { max-width: 800px; margin: 0 auto; }
-    .story-container { min-height: 50px; margin-top: 20px; }
+    * { box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      margin: 0; 
+      padding: 20px; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff; 
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    .container { 
+      max-width: 800px; 
+      margin: 0 auto; 
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    h1 { 
+      font-size: 2.5rem; 
+      margin-bottom: 1rem; 
+      text-align: center;
+      background: linear-gradient(45deg, #fff, #f0f0f0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    h2 { 
+      color: #f0f0f0; 
+      border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+      padding-bottom: 10px;
+    }
+    p { 
+      font-size: 1.1rem; 
+      margin-bottom: 1rem; 
+      color: #f5f5f5;
+    }
+    .story-container { 
+      min-height: 50px; 
+      margin-top: 20px; 
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .story-loader-section {
+      margin: 30px 0;
+    }
+    #interaction-message {
+      font-style: italic;
+      color: #e0e0e0;
+      text-align: center;
+    }
+    section {
+      margin-top: 40px;
+    }
   </style>
 </head>
 <body>
