@@ -177,7 +177,7 @@ resource "aws_lambda_function_url" "app_url" {
   cors {
     allow_credentials = false
     allow_origins     = ["*"]
-    allow_methods     = ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"]
+    allow_methods     = ["GET", "POST", "OPTIONS"]
     allow_headers     = ["*"]
     expose_headers    = ["*"]
     max_age          = 86400
