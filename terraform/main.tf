@@ -28,7 +28,7 @@ data "aws_region" "current" {}
 variable "aws_region" {
   description = "AWS region for deployment"
   type        = string
-  default     = "us-east-1"
+  default     = "eu-central-1"
 }
 
 variable "project_name" {
@@ -78,14 +78,6 @@ resource "aws_s3_bucket_public_access_block" "lambda_bucket_pab" {
   restrict_public_buckets = true
 }
 
-# Create deployment package
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/../.next/standalone"
-  output_path = "${path.module}/lambda-deployment.zip"
-  depends_on  = [null_resource.build_app]
-}
-
 # Build the Next.js app
 resource "null_resource" "build_app" {
   triggers = {
@@ -96,6 +88,14 @@ resource "null_resource" "build_app" {
   provisioner "local-exec" {
     command = "cd ${path.module}/.. && npm run build"
   }
+}
+
+# Create deployment package
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../.next/standalone"
+  output_path = "${path.module}/lambda-deployment.zip"
+  depends_on  = [null_resource.build_app]
 }
 
 # Upload Lambda deployment package to S3
