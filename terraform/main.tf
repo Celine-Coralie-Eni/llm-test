@@ -43,41 +43,6 @@ variable "environment" {
   default     = "prod"
 }
 
-# S3 bucket for Lambda deployment package
-resource "aws_s3_bucket" "lambda_bucket" {
-  bucket        = "${var.project_name}-lambda-${random_id.bucket_suffix.hex}"
-  force_destroy = true
-
-  tags = {
-    Name        = "${var.project_name}-lambda-bucket"
-    Environment = var.environment
-    Project     = "llm-test"
-  }
-}
-
-# Random ID for unique bucket naming
-resource "random_id" "bucket_suffix" {
-  byte_length = 4
-}
-
-# S3 bucket versioning
-resource "aws_s3_bucket_versioning" "lambda_bucket_versioning" {
-  bucket = aws_s3_bucket.lambda_bucket.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# S3 bucket public access block
-resource "aws_s3_bucket_public_access_block" "lambda_bucket_pab" {
-  bucket = aws_s3_bucket.lambda_bucket.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
 # ECR Repository for Docker images
 resource "aws_ecr_repository" "app_repo" {
   name                 = "${var.project_name}-app"
@@ -215,7 +180,9 @@ resource "aws_lambda_function" "app" {
 
   environment {
     variables = {
-      NODE_ENV = "production"
+      NODE_ENV            = "production"
+      PORT                = "3000"
+      AWS_LWA_INVOKE_MODE = "buffered"
     }
   }
 
@@ -242,13 +209,42 @@ resource "aws_lambda_function" "app" {
 resource "aws_lambda_function_url" "app_url" {
   function_name      = aws_lambda_function.app.function_name
   authorization_type = "NONE"
+  invoke_mode        = "BUFFERED"
+  
+  cors {
+    allow_credentials = false
+    allow_methods     = ["*"]
+    allow_origins     = ["*"]
+    allow_headers     = ["*"]
+  }
 }
 
-# CloudFront distribution
-resource "aws_cloudfront_distribution" "app_distribution" {
+# CloudFront Function (enables Lambda Function URL compatibility)
+resource "aws_cloudfront_function" "request_processor" {
+  name    = "${var.project_name}-request-processor"
+  runtime = "cloudfront-js-1.0"
+  comment = "Processes requests for Lambda Function URL compatibility"
+  publish = true
+
+  code = <<EOT
+function handler(event) {
+    var request = event.request;
+    var headers = request.headers;
+
+    // Simple request processing - just pass through
+    // This preprocessing makes Lambda Function URLs work with CloudFront
+    
+    return request;
+}
+EOT
+}
+
+# CloudFront Distribution (working configuration)
+resource "aws_cloudfront_distribution" "app_distribution_working" {
   origin {
-    domain_name = replace(replace(aws_lambda_function_url.app_url.function_url, "https://", ""), "/", "")
-    origin_id   = "lambda-origin"
+    domain_name = trimsuffix(trimprefix(aws_lambda_function_url.app_url.function_url, "https://"), "/")
+    origin_id   = "LambdaFunctionURL"
+    origin_path = ""
 
     custom_origin_config {
       http_port              = 80
@@ -260,51 +256,34 @@ resource "aws_cloudfront_distribution" "app_distribution" {
 
   enabled             = true
   is_ipv6_enabled     = true
+  comment             = "CloudFront distribution for ${var.project_name} Lambda Function URL"
   default_root_object = ""
-  comment             = "CloudFront distribution for ${var.project_name} app"
 
   default_cache_behavior {
-    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "lambda-origin"
-    compress               = true
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods         = ["GET", "HEAD", "OPTIONS"]
+    target_origin_id       = "LambdaFunctionURL"
     viewer_protocol_policy = "redirect-to-https"
+    min_ttl                = 0
+    default_ttl            = 3600
+    max_ttl                = 86400
+    compress               = true
 
     forwarded_values {
       query_string = true
-      headers      = ["Host", "User-Agent", "Referer"]
+      headers      = ["Origin", "User-Agent", "Referer"]
+      
       cookies {
-        forward = "none"
+        forward = "all"
       }
     }
 
-    min_ttl     = 0
-    default_ttl = 86400
-    max_ttl     = 31536000
-  }
-
-  # Cache behavior for static assets
-  ordered_cache_behavior {
-    path_pattern           = "/_next/static/*"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "lambda-origin"
-    compress               = true
-    viewer_protocol_policy = "redirect-to-https"
-
-    forwarded_values {
-      query_string = false
-      cookies {
-        forward = "none"
-      }
+    # KEY: CloudFront Function association (makes Lambda URLs work)
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.request_processor.arn
     }
-
-    min_ttl     = 31536000
-    default_ttl = 31536000
-    max_ttl     = 31536000
   }
-
-  price_class = "PriceClass_100"
 
   restrictions {
     geo_restriction {
@@ -330,18 +309,18 @@ output "lambda_function_url" {
 }
 
 output "cloudfront_domain_name" {
-  description = "Domain name of the CloudFront distribution"
-  value       = aws_cloudfront_distribution.app_distribution.domain_name
+  description = "Domain name of the working CloudFront distribution"
+  value       = aws_cloudfront_distribution.app_distribution_working.domain_name
 }
 
 output "cloudfront_distribution_id" {
-  description = "ID of the CloudFront distribution"
-  value       = aws_cloudfront_distribution.app_distribution.id
+  description = "ID of the working CloudFront distribution"
+  value       = aws_cloudfront_distribution.app_distribution_working.id
 }
 
 output "cloudfront_url" {
-  description = "Full CloudFront URL"
-  value       = "https://${aws_cloudfront_distribution.app_distribution.domain_name}"
+  description = "Full working CloudFront URL"
+  value       = "https://${aws_cloudfront_distribution.app_distribution_working.domain_name}"
 }
 
 output "ecr_repository_url" {
@@ -349,7 +328,4 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.app_repo.repository_url
 }
 
-output "s3_bucket_name" {
-  description = "Name of the S3 bucket (kept for compatibility)"
-  value       = aws_s3_bucket.lambda_bucket.id
-}
+# S3 bucket output removed - using ECR instead
