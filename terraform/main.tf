@@ -93,9 +93,18 @@ resource "null_resource" "build_app" {
 # Create deployment package
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../.next/standalone"
   output_path = "${path.module}/lambda-deployment.zip"
   depends_on  = [null_resource.build_app]
+
+  source {
+    content  = file("${path.module}/../index.js")
+    filename = "index.js"
+  }
+
+  source {
+    content  = file("${path.module}/../package.json")
+    filename = "package.json"
+  }
 }
 
 # Upload Lambda deployment package to S3
@@ -173,32 +182,13 @@ resource "aws_lambda_function" "app" {
 resource "aws_lambda_function_url" "app_url" {
   function_name      = aws_lambda_function.app.function_name
   authorization_type = "NONE"
-
-  cors {
-    allow_credentials = false
-    allow_origins     = ["*"]
-    allow_methods     = ["GET", "POST", "OPTIONS"]
-    allow_headers     = ["*"]
-    expose_headers    = ["*"]
-    max_age          = 86400
-  }
-}
-
-# CloudFront Origin Access Control
-resource "aws_cloudfront_origin_access_control" "app_oac" {
-  name                              = "${var.project_name}-oac"
-  description                       = "OAC for ${var.project_name}"
-  origin_access_control_origin_type = "lambda"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
 }
 
 # CloudFront distribution
 resource "aws_cloudfront_distribution" "app_distribution" {
   origin {
-    domain_name              = replace(aws_lambda_function_url.app_url.function_url, "https://", "")
-    origin_id                = "lambda-origin"
-    origin_access_control_id = aws_cloudfront_origin_access_control.app_oac.id
+    domain_name = replace(replace(aws_lambda_function_url.app_url.function_url, "https://", ""), "/", "")
+    origin_id   = "lambda-origin"
 
     custom_origin_config {
       http_port              = 80
