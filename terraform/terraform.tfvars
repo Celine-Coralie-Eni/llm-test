@@ -1,4 +1,4 @@
-# Terraform variables for LLM manipulation app deployment
+# Terraform variables for llm-test app deployment
 
 # AWS Configuration
 aws_region = "us-east-1" 

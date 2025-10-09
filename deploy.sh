@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# LLM Manipulation App - AWS Deployment Script
+# llm-test App - AWS Deployment Script
 # This script deploys the Next.js app to AWS using Terraform
 
 set -e  # Exit on any error
 
-echo "🚀 Starting LLM Manipulation App Deployment to AWS..."
+echo "🚀 Starting llm-test App Deployment to AWS..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -122,7 +122,7 @@ get_deployment_info() {
     echo "🌐 CloudFront URL: $CLOUDFRONT_URL"
     echo "📡 CloudFront Domain: $CLOUDFRONT_DOMAIN"
     echo ""
-    echo "🧪 Test your LLM manipulation:"
+    echo "🧪 Test your app:"
     echo "curl -s $CLOUDFRONT_URL | grep -c -i 'eldrin|wizard|enchanted'"
     echo "Expected result: 0 (story hidden from crawlers)"
     echo ""
@@ -134,8 +134,8 @@ get_deployment_info() {
 
 # Main deployment process
 main() {
-    echo "🎯 LLM Manipulation App - AWS Deployment"
-    echo "========================================"
+    echo "🎯 llm-test App - AWS Deployment"
+    echo "================================="
     echo ""
     
     check_requirements
@@ -144,7 +144,7 @@ main() {
     deploy_infrastructure
     get_deployment_info
     
-    print_success "🎉 Deployment completed! Your LLM manipulation app is now live on AWS!"
+    print_success "🎉 Deployment completed! Your llm-test app is now live on AWS!"
 }
 
 # Run the deployment

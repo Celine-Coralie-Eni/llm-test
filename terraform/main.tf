@@ -1,4 +1,4 @@
-# Terraform configuration for LLM manipulation app deployment
+# Terraform configuration for llm-test app deployment
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -51,7 +51,7 @@ resource "aws_s3_bucket" "lambda_bucket" {
   tags = {
     Name        = "${var.project_name}-lambda-bucket"
     Environment = var.environment
-    Project     = "LLM-Manipulation"
+    Project     = "llm-test"
   }
 }
 
@@ -165,7 +165,7 @@ resource "aws_lambda_function" "app" {
   tags = {
     Name        = "${var.project_name}-lambda"
     Environment = var.environment
-    Project     = "LLM-Manipulation"
+    Project     = "llm-test"
   }
 }
 
@@ -211,7 +211,7 @@ resource "aws_cloudfront_distribution" "app_distribution" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = ""
-  comment             = "CloudFront distribution for ${var.project_name} LLM manipulation app"
+  comment             = "CloudFront distribution for ${var.project_name} app"
 
   default_cache_behavior {
     allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
@@ -269,7 +269,7 @@ resource "aws_cloudfront_distribution" "app_distribution" {
   tags = {
     Name        = "${var.project_name}-cloudfront"
     Environment = var.environment
-    Project     = "LLM-Manipulation"
+    Project     = "llm-test"
   }
 }
 
