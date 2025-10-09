@@ -1,7 +1,7 @@
 # Terraform variables for llm-test app deployment
 
 # AWS Configuration
-aws_region = "us-east-1" 
+aws_region = "eu-central-1" 
 
 # Project Configuration
 project_name = "llm-test"
