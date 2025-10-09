@@ -1,0 +1,43 @@
+# Lambda deployment artifacts
+lambda-deployment.zip
+lambda-package/
+
+# Node.js artifacts from parent directory
+../node_modules/
+../.next/
+../build/
+../dist/
+../out/
+
+# Development files
+../.env*
+../.vscode/
+../.idea/
+../package-lock.json
+../yarn.lock
+
+# Source files that Terraform doesn't need to scan
+../*.js
+../*.ts
+../*.jsx
+../*.tsx
+../*.json
+../*.md
+../src/
+../public/
+
+# Cache and temporary files
+../.cache/
+../tmp/
+../temp/
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+../.DS_Store
+Thumbs.db
+
+# Git files
+../.git/
+../.gitignore

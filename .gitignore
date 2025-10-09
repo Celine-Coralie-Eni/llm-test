@@ -40,5 +40,47 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-#Extra
+# Lambda deployment artifacts
+lambda-package/
+lambda-deployment.zip
+*.zip
+
+# Terraform files
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfplan
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+
+# Cache directories
+.cache/
+tmp/
+temp/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+*.code-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Extra
 ZNotes
+
+# Allow specific env files if needed
+!.env.example
+!.env.template

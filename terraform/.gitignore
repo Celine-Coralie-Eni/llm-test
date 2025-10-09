@@ -1,7 +1,9 @@
-# Terraform files
+# Terraform state files
 *.tfstate
 *.tfstate.*
+*.tfstate.backup
 *.tfplan
+*.tfplan.*
 .terraform/
 .terraform.lock.hcl
 
@@ -9,17 +11,53 @@
 terraform.tfvars
 *.tfvars
 *.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
 
-# Lambda deployment package
+# Lambda deployment artifacts
+lambda-package/
 lambda-deployment.zip
+*.zip
+
+# Node.js artifacts (shouldn't be in terraform dir but just in case)
+node_modules/
+.next/
+build/
+dist/
+out/
+
+# Cache and temporary files
+.cache/
+tmp/
+temp/
+*.tmp
+*.temp
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # IDE files
 .vscode/
 .idea/
+*.sublime-*
+*.code-workspace
 *.swp
 *.swo
+
+# Logs
+*.log
+logs/
+
+# Documentation (optional - remove if you want to track these)
 README.md
+CHANGELOG.md
+
+# Backup files
+*.bak
+*.backup
