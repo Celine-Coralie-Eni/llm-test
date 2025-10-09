@@ -5,6 +5,11 @@
 .terraform/
 .terraform.lock.hcl
 
+# Terraform variable files (may contain sensitive data)
+terraform.tfvars
+*.tfvars
+*.tfvars.json
+
 # Lambda deployment package
 lambda-deployment.zip
 
